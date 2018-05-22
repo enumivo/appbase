@@ -2,6 +2,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/asio/signal_set.hpp>
 
 #include <iostream>
@@ -210,6 +211,7 @@ void application::quit() {
 }
 
 void application::exec() {
+   bool was_bad_alloc = false;
    std::shared_ptr<boost::asio::signal_set> sigint_set(new boost::asio::signal_set(*io_serv, SIGINT));
    sigint_set->async_wait([sigint_set,this](const boost::system::error_code& err, int num) {
      quit();
@@ -222,9 +224,19 @@ void application::exec() {
      sigterm_set->cancel();
    });
 
+   std::shared_ptr<boost::asio::signal_set> sigfail_set(new boost::asio::signal_set(*io_serv, SIGUSR1));
+   sigfail_set->async_wait([sigfail_set,this,&was_bad_alloc](const boost::system::error_code& err, int num) {
+      quit();
+      sigfail_set->cancel();
+      was_bad_alloc = true;
+   });
+
    io_serv->run();
 
    shutdown(); /// perform synchronous shutdown
+   
+   if (was_bad_alloc)
+      throw boost::interprocess::bad_alloc();
 }
 
 void application::write_default_config(const bfs::path& cfg_file) {
