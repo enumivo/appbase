@@ -182,11 +182,16 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
             get_plugin(name).initialize(options);
       }
    }
-   for (auto plugin : autostart_plugins)
-      if (plugin != nullptr && plugin->get_state() == abstract_plugin::registered)
-         plugin->initialize(options);
+   try {
+      for (auto plugin : autostart_plugins)
+         if (plugin != nullptr && plugin->get_state() == abstract_plugin::registered)
+            plugin->initialize(options);
 
-   bpo::notify(options);
+      bpo::notify(options);
+   } catch (...) {
+      std::cerr << "Failed to initialize\n";
+      return false;
+   }
 
    return true;
 }
@@ -224,11 +229,10 @@ void application::exec() {
      sigterm_set->cancel();
    });
 
-   std::shared_ptr<boost::asio::signal_set> sigfail_set(new boost::asio::signal_set(*io_serv, SIGUSR1));
-   sigfail_set->async_wait([sigfail_set,this,&was_bad_alloc](const boost::system::error_code& err, int num) {
-      quit();
-      sigfail_set->cancel();
-      was_bad_alloc = true;
+   std::shared_ptr<boost::asio::signal_set> sigpipe_set(new boost::asio::signal_set(*io_serv, SIGPIPE));
+   sigpipe_set->async_wait([sigpipe_set,this](const boost::system::error_code& err, int num) {
+     quit();
+     sigpipe_set->cancel();
    });
 
    io_serv->run();
