@@ -4,6 +4,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -266,7 +267,9 @@ void application::print_default_config(std::ostream& os) {
    for(const boost::shared_ptr<bpo::option_description> od : my->_cfg_options.options())
    {
       if(!od->description().empty()) {
-         os << "# " << od->description();
+         std::string desc = od->description();
+         boost::replace_all(desc, "\n", "\n# ");
+         os << "# " << desc;
          std::map<std::string, std::string>::iterator it;
          if((it = option_to_plug.find(od->long_name())) != option_to_plug.end())
             os << " (" << it->second << ")";
